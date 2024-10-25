@@ -17,6 +17,7 @@ use ethers::utils::hex;
 use std::str::FromStr;
 use pyo3::{IntoPy, PyObject};
 use pyo3::types::{PyList, PyDict};
+use futures::future::join_all;
 
 const NUM_BLOCKS: u64 = 100; // Number of blocks to consider for average block time calculation
 const FACTORY_ADDRESS: &str = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
@@ -197,9 +198,9 @@ impl BlockchainClient {
         BlockchainClient { provider }
     }
 
-    fn get_pool_events_by_token_pairs(&self, py: Python, token0: String, token1: String, from_block: u64, to_block: u64, fee: u32) -> PyResult<PyObject> {
+    fn get_pool_events_by_token_pairs(&self, py: Python, token_pairs: Vec<(String, String, u32)> , from_block: u64, to_block: u64) -> PyResult<PyObject> {
         let rt = Runtime::new().unwrap();
-        match rt.block_on(get_pool_events_by_token_pairs(self.provider.clone(), &token0, &token1, U64::from(from_block), U64::from(to_block), fee)) {
+        match rt.block_on(get_pool_events_by_token_pairs(self.provider.clone(), token_pairs, U64::from(from_block), U64::from(to_block))) {
             Ok(result) => Ok(PyValue(serde_json::json!(result)).into_py(py)),
             Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e.to_string())),
         }
@@ -211,11 +212,11 @@ impl BlockchainClient {
         (result.0.as_u64(), result.1.as_u64())
     }
 
-    fn fetch_pool_data(&self, py: Python, token0: String, token1: String, fee:u32, start_datetime: String, end_datetime: String, interval: String) -> PyResult<PyObject> {
+    fn fetch_pool_data(&self, py: Python, token_pairs: Vec<(String, String, u32)>, start_datetime: String, end_datetime: String, interval: String) -> PyResult<PyObject> {
         let rt = Runtime::new().unwrap();
-        match rt.block_on(fetch_pool_data(self.provider.clone(), &token0, &token1, fee, &start_datetime, &end_datetime, &interval)) {
-            Ok(result) => Ok(PyValue(result).into_py(py)),
-            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e.to_string())),
+        match rt.block_on(fetch_pool_data(self.provider.clone(), token_pairs, &start_datetime, &end_datetime, &interval)) {
+            Ok(result) => Ok(PyValue(serde_json::json!(result)).into_py(py)),
+            Err(e) => return Err(pyo3::exceptions::PyRuntimeError::new_err(e.to_string())),
         }
     }
 
@@ -246,12 +247,12 @@ async fn get_pool_address(provider: Arc<Provider<Http>>, factory_address: Addres
 
 async fn get_pool_events_by_pool_address(
     provider: Arc<Provider<Http>>,
-    pool_address: H160,
+    pool_addresses: Vec<H160>,
     from_block: U64,
     to_block: U64
 ) -> Result<Vec<Log>, Box<dyn std::error::Error + Send + Sync>> {
     let filter = Filter::new()
-        .address(pool_address)
+        .address(pool_addresses)
         .from_block(from_block)
         .to_block(to_block)
         .topic0(vec![
@@ -268,27 +269,39 @@ async fn get_pool_events_by_pool_address(
 
 async fn get_pool_events_by_token_pairs(
     provider: Arc<Provider<Http>>,
-    token0: &str,
-    token1: &str,
+    token_pairs: Vec<(String, String, u32)>,
     from_block: U64,
     to_block: U64,
-    fee: u32,
 ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
 
     // Get the Uniswap V3 factory address
     let factory_address = Address::from_str("0x1F98431c8aD98523631AE4a59f267346ea31F984")?;
 
-    // Get the pool address for the given token pair
-    let token0_address = Address::from_str(token0)?;
-    let token1_address = Address::from_str(token1)?;
-    let pool_address = get_pool_address(provider.clone(), factory_address, token0_address, token1_address, fee).await?;
-    println!("Fetched pool address: {:?}", pool_address);
+    let futures = token_pairs.into_iter().map(|(token0, token1, fee)| {
+        let provider = provider.clone();
+        async move {
+            let token0_address = Address::from_str(&token0)?;
+            let token1_address = Address::from_str(&token1)?;
+            let pool_address = get_pool_address(provider.clone(), factory_address, token0_address, token1_address, fee).await?;
+            Ok(pool_address) as Result<Address, Box<dyn std::error::Error + Send + Sync>>
+        }
+    });
 
-    let logs = get_pool_events_by_pool_address(provider.clone(), pool_address, from_block, to_block).await?;
-    println!("Fetched {} logs", logs.len());
+    let pool_addresses_results = join_all(futures).await;
+
+    let mut pool_addresses = Vec::new();
+    for result in pool_addresses_results {
+        match result {
+            Ok(pool_address) => pool_addresses.push(pool_address),
+            Err(e) => return Err(e),
+        }
+    }
+
+    println!("Fetched pool address: {:?}", pool_addresses);
+
+    let logs = get_pool_events_by_pool_address(provider, pool_addresses, from_block, to_block).await?;
     
     let mut data = Vec::new();
-    // Decode the logs
     for log in logs {
         match decode_uniswap_event(&log) {
             Ok(event) => {
@@ -301,6 +314,7 @@ async fn get_pool_events_by_token_pairs(
                 };
                 uniswap_event_with_metadata.as_object_mut().unwrap().insert("transaction_hash".to_string(), serde_json::Value::String(hex::encode(transaction_hash.as_bytes())));
                 uniswap_event_with_metadata.as_object_mut().unwrap().insert("block_number".to_string(), serde_json::Value::Number(serde_json::Number::from(block_number)));
+                uniswap_event_with_metadata.as_object_mut().unwrap().insert("pool_address".to_string(), serde_json::Value::String(format!("{:?}", log.address)));
                 data.push(uniswap_event_with_metadata);
             },
             Err(e) => return Err(e),
@@ -410,11 +424,11 @@ async fn get_block_number_from_timestamp(
     Ok(low)
 }
 
-async fn fetch_pool_data(provider: Arc::<Provider<Http>>,token0: &str, token1: &str, fee: u32, start_datetime: &str, end_datetime: &str, _interval: &str) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+async fn fetch_pool_data(provider: Arc::<Provider<Http>>, token_pairs: Vec<(String, String, u32)>, start_datetime: &str, end_datetime: &str, _interval: &str) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
     // let date_str = "2024-09-27 19:34:56";
     let (from_block, to_block) = get_block_number_range(provider.clone(), start_datetime, end_datetime).await?;
 
-    let pool_events = get_pool_events_by_token_pairs(provider.clone(), token0, token1, from_block, to_block, fee).await?;
+    let pool_events = get_pool_events_by_token_pairs(provider.clone(), token_pairs, from_block, to_block,).await?;
     Ok(pool_events)
 }
 
@@ -479,8 +493,9 @@ mod tests {
         let fee = 3000;
 
         let provider = Arc::new(Provider::<Http>::try_from(rpc_url).unwrap());
+        let token_pairs = vec![(token0.to_string(), token1.to_string(), fee)];
 
-        let __result = fetch_pool_data(provider, token0, token1, fee, start_datetime, end_datetime, interval).await;
+        let __result = fetch_pool_data(provider, token_pairs, start_datetime, end_datetime, interval).await;
         assert!(__result.is_ok());
     }
 }

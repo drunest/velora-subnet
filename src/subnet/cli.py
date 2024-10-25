@@ -16,16 +16,17 @@ def serve(
     commune_key: Annotated[
         str, typer.Argument(help="Name of the key present in `~/.commune/key`")
     ],
+    netuid: int = typer.Option(38, help="Netuid of the subnet"),
+    network: str = typer.Option("testnet", help="Network to connect to"),
     call_timeout: int = 65,
 ):
     keypair = classic_load_key(commune_key)  # type: ignore
     settings = ValidatorSettings()  # type: ignore
 
-    c_client = CommuneClient(get_node_url(use_testnet=True))
-    subnet_uid = get_subnet_netuid(c_client, "velora")
+    c_client = CommuneClient(get_node_url(use_testnet = network == "testnet"))  # type: ignore
     validator = VeloraValidator(
         keypair,
-        subnet_uid,
+        netuid,
         c_client,
         call_timeout=call_timeout,
     )

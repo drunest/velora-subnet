@@ -222,7 +222,7 @@ class VeloraValidator(Module):
 
     def _get_miner_prediction(
         self,
-        question: tuple[int, int],
+        question: dict,
         miner_info: tuple[list[str], Ss58Address],
     ) -> str | None:
         """
@@ -295,19 +295,15 @@ class VeloraValidator(Module):
             end = last_time_range["end"] + timedelta(days=1)
         
         self.db_manager.add_timetable_entry(start, end)
-        self.db_manager.create_token_pairs_table(start, end)
         
-        if last_time_range:
-            previous_token_pairs = self.db_manager.fetch_token_pairs(last_time_range["start"], last_time_range["end"])
-            self.db_manager.add_token_pairs(start, end, previous_token_pairs)
-
         start_date_str = start.strftime("%Y-%m-%d %H:%M:%S")
         end_date_str = end.strftime("%Y-%m-%d %H:%M:%S")
         
         log(f"Fetching token pairs between {start_date_str} and {end_date_str}")
         
         token_pairs = self.pool_data_fetcher.get_pool_created_events_between_two_timestamps(start_date_str, end_date_str)
-        self.db_manager.add_token_pairs(start, end, token_pairs)
+        self.db_manager.reset_token_pairs()
+        self.db_manager.add_token_pairs(token_pairs)
         
         return start, end
     
@@ -325,7 +321,7 @@ class VeloraValidator(Module):
         else:
             return incompleted_time_range[0]["start"], incompleted_time_range[0]["end"]
     
-    def get_token_pair(self, start: datetime, end: datetime) -> list[dict[str, str]]:
+    def get_token_pairs(self, start: datetime, end: datetime) -> list[dict[str, str]]:
         """
         Get the token pairs for the miner modules.
 
@@ -336,12 +332,12 @@ class VeloraValidator(Module):
         Returns:
             The token pairs for the miner modules.
         """
-        token_pairs = self.db_manager.fetch_incompleted_token_pairs(start, end)
+        token_pairs = self.db_manager.fetch_incompleted_token_pairs()
         
         if not token_pairs:
             self.db_manager.mark_time_range_as_complete(start, end)
             return None
-        return token_pairs[0]
+        return token_pairs[:15]
 
     def get_miner_prompt(self) -> dict:
         """
@@ -352,19 +348,20 @@ class VeloraValidator(Module):
         """
         while True:
             time_range = self.get_time_range()
-            token_pair = self.get_token_pair(time_range[0], time_range[1])
+            token_pairs = self.get_token_pairs(time_range[0], time_range[1])
             
-            if token_pair:
+            if token_pairs:
                 break
 
         # Implement your custom prompt generation logic here
-        token0=token_pair["token0"]
-        token1=token_pair["token1"]
-        fee=int(token_pair["fee"])
         start_datetime=time_range[0].strftime("%Y-%m-%d %H:%M:%S")
         end_datetime=time_range[1].strftime("%Y-%m-%d %H:%M:%S")
+        
+        req_token_pairs = []
+        for token_pair in token_pairs:
+            req_token_pairs.append((token_pair['token0'], token_pair['token1'], token_pair['fee']))
 
-        return {"token0": token0, "token1": token1, "fee": fee, "start_datetime": start_datetime, "end_datetime": end_datetime}
+        return {"token_pairs": req_token_pairs, "start_datetime": start_datetime, "end_datetime": end_datetime}
         
     def check_miner_answer(self, miner_prompt: dict, miner_answer: dict | None) -> bool:
         """
@@ -374,9 +371,7 @@ class VeloraValidator(Module):
             miner_prompt: The prompt for the miner modules.
             miner_answer: The generated answer from the miner module.
         """
-        token0 = miner_prompt.get("token0", None)
-        token1 = miner_prompt.get("token1", None)
-        fee = int(miner_prompt.get("fee", None))
+        token_pairs = miner_prompt.get("token_pairs", None)
         start_datetime = miner_prompt.get("start_datetime", None)
         end_datetime = miner_prompt.get("end_datetime", None)
         
@@ -395,7 +390,7 @@ class VeloraValidator(Module):
             if block_number < block_number_start or block_number > block_number_end:
                 return False
             
-            block_data_from_pools = self.pool_data_fetcher.get_pool_events_by_token_pairs(token0, token1, block_number, block_number, fee)
+            block_data_from_pools = self.pool_data_fetcher.get_pool_events_by_token_pairs(token_pairs, block_number, block_number)
             for block_data_of_pool in block_data_from_pools.get("data", []):
                 if block_data_of_pool.get("transaction_hash") == block_data.get("transaction_hash"):
                     return True
@@ -409,20 +404,17 @@ class VeloraValidator(Module):
             miner_prompt: The prompt for the miner modules.
             miner_answer: The generated answer from the miner module
         """
-        token0 = miner_prompt.get("token0", None)
-        token1 = miner_prompt.get("token1", None)
-        fee = miner_prompt.get("fee", None)
+        token_pairs = miner_prompt.get("token_pairs", None)
         start_datetime = miner_prompt.get("start_datetime", None)
         end_datetime = miner_prompt.get("end_datetime", None)
         
         miner_data = miner_answer.get("data", None)
         
-        self.db_manager.create_pool_data_table(token0, token1, fee)
-        self.db_manager.add_pool_data(token0, token1, fee, miner_data)
+        self.db_manager.add_pool_data(miner_data)
         
-        self.db_manager.mark_token_pair_as_complete(start_datetime, end_datetime, token0, token1, fee)
+        self.db_manager.mark_token_pairs_as_complete(token_pairs)
         
-        token_pairs = self.db_manager.fetch_incompleted_token_pairs(start_datetime, end_datetime)
+        token_pairs = self.db_manager.fetch_incompleted_token_pairs()
         
         if not token_pairs:
             self.db_manager.mark_time_range_as_complete(start_datetime, end_datetime)
@@ -443,7 +435,6 @@ class VeloraValidator(Module):
 
             score = self._score_miner(miner_answer, trust_miner_result)
             time.sleep(0.5)
-            print(f"key: {key} miner_answer: {miner_answer} score: {score}")
             # score has to be lower or eq to 1, as one is the best score, you can implement your custom logic
             assert score <= 1
             accuracy_score[key] = score

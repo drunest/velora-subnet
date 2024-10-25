@@ -26,14 +26,11 @@ class Miner(Module):
     @endpoint
     def fetch(self, query: dict) -> str:
         # Generate a response from scraping the rpc server
-        print(f'query: {query}')
-        print(f'type of query: {type(query)}')
-        token0 = query.get("token0", None)
-        token1 = query.get("token1", None)
-        fee = int(query.get("fee", 0))
+        token_pairs = query.get("token_pairs", None)
         start_datetime = query.get("start_datetime", None)
         end_datetime = query.get("end_datetime", None)
-        result = self.pool_data_fetcher.fetch_pool_data(token0, token1, fee, start_datetime, end_datetime, "1h")
+        token_pairs_for_pool = [tuple(token_pair) for token_pair in token_pairs]
+        result = self.pool_data_fetcher.fetch_pool_data(token_pairs_for_pool, start_datetime, end_datetime, "1h")
         
         return json.dumps(result)
 
@@ -52,12 +49,12 @@ if __name__ == "__main__":
     bucket = TokenBucketLimiter(20, refill_rate)
     server = ModuleServer(miner, key, limiter=bucket, subnets_whitelist=[41], use_testnet=True)
     app = server.get_fastapi_app()
-    token0 = "0xaea46a60368a7bd060eec7df8cba43b7ef41ad85"
-    token1 = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-    start_datetime = "2024-09-27 11:24:56"
-    end_datetime = "2024-09-27 15:25:56"
-    interval = "1h"
-    print(pool_data_fetcher.fetch_pool_data_py(token0, token1, start_datetime, end_datetime, interval))
+    # token0 = "0xaea46a60368a7bd060eec7df8cba43b7ef41ad85"
+    # token1 = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    # start_datetime = "2024-09-27 11:24:56"
+    # end_datetime = "2024-09-27 15:25:56"
+    # interval = "1h"
+    # print(pool_data_fetcher.fetch_pool_data_py(token0, token1, start_datetime, end_datetime, interval))
 
     # Only allow local connections
     uvicorn.run(app, host="0.0.0.0", port=9962)

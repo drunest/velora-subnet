@@ -16,60 +16,72 @@ class Timetable(Base):
     end = Column(Date)
     completed = Column(Boolean)
 
-def token_pairs_table_columns(): return [
-    Column('token0', String, nullable=False),
-    Column('token1', String, nullable=False),
-    Column('fee', Integer, nullable=False),
-    Column('completed', Boolean, nullable=False)
-]
+class Tokenpairstable(Base):
+    __tablename__ = 'token_pairs'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token0 = Column(String, nullable=False)
+    token1 = Column(String, nullable=False)
+    fee = Column(Integer, nullable=False)
+    pool = Column(String, nullable=False)
+    block_number = Column(String, nullable=False)
+    completed = Column(Boolean, nullable=False)
 
-def pool_data_table_columns(): return [
-    Column('block_number', String, nullable=False),
-    Column('event_type', String, nullable=False),
-    Column('transaction_hash', String, nullable=False)
-]
+class Pooldatatable(Base):
+    __tablename__ = 'pool_data'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    block_number = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    transaction_hash = Column(String, nullable=False)
 
-def swap_event_table_columns(): return [
-    Column('transaction_hash', String, nullable=False),
-    Column('sender', String, nullable=False),
-    Column('to', String, nullable=False),
-    Column('amount0', String, nullable=False),  # I256 can be stored as String
-    Column('amount1', String, nullable=False),  # I256 can be stored as String
-    Column('sqrt_price_x96', String, nullable=False),  # U256 can be stored as String
-    Column('liquidity', String, nullable=False),  # U256 can be stored as String
-    Column('tick', Integer, nullable=False)  # i32 can be stored as Integer
-]
+class SwapEventTable(Base):
+    __tablename__ = 'swap_event'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_hash = Column(String, nullable=False)
+    pool_address = Column(String, nullable=False)
+    sender = Column(String, nullable=False)
+    to = Column(String, nullable=False)
+    amount0 = Column(String, nullable=False)  # I256 can be stored as String
+    amount1 = Column(String, nullable=False)  # I256 can be stored as String
+    sqrt_price_x96 = Column(String, nullable=False)  # U256 can be stored as String
+    liquidity = Column(String, nullable=False)  # U256 can be stored as String
+    tick = Column(Integer, nullable=False)  # i32 can be stored as Integer
 
-def mint_event_table_columns(): return [
-    Column('transaction_hash', String, nullable=False),
-    Column('sender', String, nullable=False),
-    Column('owner', String, nullable=False),
-    Column('tick_lower', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('tick_upper', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('amount', String, nullable=False),  # U256 can be stored as String
-    Column('amount0', String, nullable=False),  # U256 can be stored as String
-    Column('amount1', String, nullable=False)  # U256 can be stored as String
-]
+class MintEventTable(Base):
+    __tablename__ = 'mint_event'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_hash = Column(String, nullable=False)
+    pool_address = Column(String, nullable=False)
+    sender = Column(String, nullable=False)
+    owner = Column(String, nullable=False)
+    tick_lower = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    tick_upper = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    amount = Column(String, nullable=False)  # U256 can be stored as String
+    amount0 = Column(String, nullable=False)  # U256 can be stored as String
+    amount1 = Column(String, nullable=False)  # U256 can be stored as String
 
-def burn_event_table_columns(): return [
-    Column('transaction_hash', String, nullable=False),
-    Column('owner', String, nullable=False),
-    Column('tick_lower', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('tick_upper', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('amount', String, nullable=False),  # U256 can be stored as String
-    Column('amount0', String, nullable=False),  # U256 can be stored as String
-    Column('amount1', String, nullable=False)  # U256 can be stored as String
-]
+class BurnEventTable(Base):
+    __tablename__ = 'burn_event'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_hash = Column(String, nullable=False)
+    pool_address = Column(String, nullable=False)
+    owner = Column(String, nullable=False)
+    tick_lower = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    tick_upper = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    amount = Column(String, nullable=False)  # U256 can be stored as String
+    amount0 = Column(String, nullable=False)  # U256 can be stored as String
+    amount1 = Column(String, nullable=False)  # U256 can be stored as String
 
-def collect_event_table_columns(): return [
-    Column('transaction_hash', String, nullable=False),
-    Column('owner', String, nullable=False),
-    Column('recipient', String, nullable=False),
-    Column('tick_lower', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('tick_upper', Integer, nullable=False),  # int24 can be stored as Integer
-    Column('amount0', String, nullable=False),  # U256 can be stored as String
-    Column('amount1', String, nullable=False)  # U256 can be stored as String
-]
+class CollectEventTable(Base):
+    __tablename__ = 'collect_event'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transaction_hash = Column(String, nullable=False)
+    pool_address = Column(String, nullable=False)
+    owner = Column(String, nullable=False)
+    recipient = Column(String, nullable=False)
+    tick_lower = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    tick_upper = Column(Integer, nullable=False)  # int24 can be stored as Integer
+    amount0 = Column(String, nullable=False)  # U256 can be stored as String
+    amount1 = Column(String, nullable=False)  # U256 can be stored as String
 
 class DBManager:
 
@@ -129,282 +141,94 @@ class DBManager:
                 return True
             return False
 
-    def create_token_pairs_table(self, start: Date, end: Date) -> Table:
-        """Create a new token pairs table for the specified time range."""
-        start, end = self.date_normalize(start, end)
-                
-        new_table_name = f'token_pairs_{start}_{end}'
-        metadata = MetaData()
-        columns = token_pairs_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-    
-    def ensure_table_exists(self, table_name: str, func, **args) -> Table:
-        # Check if table exists, if not create it
-        inspector = inspect(self.engine)
-        
-        if table_name not in inspector.get_table_names():
-            print(f'creating table {table_name} with args: {args}')
-            return func(**args)
-        print(f'table {table_name} already exists')
-
-    def add_token_pairs(self, start: Date, end: Date, token_pairs: List[Dict[str, Union[str, int]]]) -> None:
+    def add_token_pairs(self, token_pairs: List[Dict[str, Union[str, int]]]) -> None:
         """Add token pairs to the corresponding table."""
-        start, end = self.date_normalize(start, end)
-        table_name = f'token_pairs_{start}_{end}'
-        # self.ensure_table_exists(table_name, self.create_token_pairs_table, start=start, end=end)
-        table = Table(table_name, MetaData(), autoload_with=self.engine)
         
         insert_values = [
-            {'token0': token_pair['token0'], 'token1': token_pair['token1'], 'fee': token_pair['fee'], 'completed': False}
+            Tokenpairstable(token0 = token_pair['token0'], token1 = token_pair['token1'], fee = token_pair['fee'], pool = token_pair['pool'], block_number = token_pair['block_number'], completed = False)
             for token_pair in token_pairs
         ]
         
-        insert_query = table.insert().values(insert_values)
         with self.Session() as session:
-            session.execute(insert_query)
+            session.add_all(insert_values)
             session.commit()
     
-    def date_normalize(self, start: Date, end: Date) -> tuple:
-        if isinstance(start, str):
-            start = datetime.strptime(start, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
-        elif isinstance(start, datetime):
-            start = start.strftime("%Y-%m-%d")
-        elif isinstance(start, Date):
-            start = start.strftime("%Y-%m-%d")
-        
-        if isinstance(end, str):
-            end = datetime.strptime(end, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
-        elif isinstance(end, datetime):
-            end = end.strftime("%Y-%m-%d")
-        elif isinstance(end, Date):
-            end = end.strftime("%Y-%m-%d")
-            
-        return start, end       
-        
-
-    def fetch_token_pairs(self, start: Date, end: Date) -> List[Dict[str, Union[str, int, bool]]]:
+    def fetch_token_pairs(self):
         """Fetch all token pairs from the corresponding table."""
-        start, end = self.date_normalize(start, end)
-        table_name = f'token_pairs_{start}_{end}'
-        # self.ensure_table_exists(table_name, self.create_token_pairs_table, start=start, end=end)
-        table = Table(table_name, MetaData(), autoload_with=self.engine)
-        
-        with self.engine.connect() as conn:
-            token_pairs_data = conn.execute(table.select()).fetchall()
-            return [{"token0": row.token0, "token1": row.token1, "fee": row.fee, "completed": row.completed} for row in token_pairs_data]
+        with self.Session() as session:
+            token_pairs = session.query(Tokenpairstable).all()
+            return [{"token0": row.token0, "token1": row.token1, "fee": row.fee, "completed": row.completed} for row in token_pairs]
 
-    def fetch_incompleted_token_pairs(self, start: Date, end: Date) -> List[Dict[str, Union[str, int, bool]]]:
+    def fetch_incompleted_token_pairs(self) -> List[Dict[str, Union[str, int, bool]]]:
         """Fetch all incompleted token pairs from the corresponding table."""
-        start, end = self.date_normalize(start, end)
-        table_name = f'token_pairs_{start}_{end}'
-        # self.ensure_table_exists(table_name, self.create_token_pairs_table, start=start, end=end)
-        table = Table(table_name, MetaData(), autoload_with=self.engine)
-        
-        with self.engine.connect() as conn:
-            completed_data = conn.execute(table.select().where(table.c.completed == False)).fetchall()
-            return [{"token0": row.token0, "token1": row.token1, "fee": row.fee, "completed": row.completed} for row in completed_data]
+        with self.Session() as session:
+            incompleted_token_pairs = session.query(Tokenpairstable).filter_by(completed=False).all()
+            return [{"token0": row.token0, "token1": row.token1, "fee": row.fee, "completed": row.completed} for row in incompleted_token_pairs]
 
-    def mark_token_pair_as_complete(self, start: Date, end: Date, token0: str, token1: str, fee: int) -> bool:
+    def mark_token_pairs_as_complete(self, token_pairs: List[tuple]) -> bool:
         """Mark a token pair as complete."""
-        start, end = self.date_normalize(start, end)
-        table_name = f'token_pairs_{start}_{end}'
-        # self.ensure_table_exists(table_name, self.create_token_pairs_table, start=start, end=end)
-        table = Table(table_name, MetaData(), autoload_with=self.engine)
-        
-        with self.engine.connect() as conn:
-            record = conn.execute(table.select().where(table.c.token0 == token0).where(table.c.token1 == token1).where(table.c.fee == fee)).fetchone()
-            
-            if record:
-                update_query = table.update().where(table.c.token0 == token0).where(table.c.token1 == token1).where(table.c.fee == fee).values(completed=True)
-                conn.execute(update_query)
-                return True
-            return False
+        with self.Session() as session:
+            for token_pair in token_pairs:
+                record = session.query(Tokenpairstable).filter_by(token0=token_pair[0], token1=token_pair[1], fee=token_pair[2]).first()
+                if record:
+                    record.completed = True
+                    session.commit()
+                else:
+                    return False
+            return True
+    def reset_token_pairs(self):
+        """Reset the token pairs completed state"""
+        with self.Session() as session:
+            session.query(Tokenpairstable).update({Tokenpairstable.completed: False})
+            session.commit()
 
-    def create_pool_data_table(self, token0: str, token1: str, fee: int) -> Table:
-        """Create a new pool data table."""
-        token0 = token0[-4:]
-        token1 = token1[-4:]
-                
-        new_table_name = f'pool_data_{token0}_{token1}_{fee}'
-        metadata = MetaData()
-        columns = pool_data_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-            
-            self.create_swap_event_table(token0, token1, fee)
-            self.create_mint_event_table(token0, token1, fee)
-            self.create_burn_event_table(token0, token1, fee)
-            self.create_collect_event_table(token0, token1, fee)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-
-    def create_swap_event_table(self, token0: str, token1: str, fee: int) -> Table:
-        """Create a new swap event table."""
-        new_table_name = f'swap_event_{token0}_{token1}_{fee}'
-        metadata = MetaData()
-        columns=swap_event_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-
-    def create_mint_event_table(self, token0: str, token1: str, fee: int) -> Table:
-        """Create a new mint event table."""
-        new_table_name = f'mint_event_{token0}_{token1}_{fee}'
-        metadata = MetaData()
-        columns = mint_event_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-
-    def create_burn_event_table(self, token0: str, token1: str, fee: int) -> Table:
-        """Create a new burn event table."""
-        new_table_name = f'burn_event_{token0}_{token1}_{fee}'
-        metadata = MetaData()
-        columns = burn_event_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-
-    def create_collect_event_table(self, token0: str, token1: str, fee: int) -> Table:
-        """Create a new collect event table."""
-        new_table_name = f'collect_event_{token0}_{token1}_{fee}'
-        metadata = MetaData()
-        columns = collect_event_table_columns()
-        
-        new_table = Table(
-            new_table_name,
-            metadata,
-            *columns
-        )
-        
-        try:
-            new_table.create(self.engine)
-        except Exception as e:
-            print(f"Error creating table {new_table_name}: {e}")
-        return new_table
-
-    def add_pool_data(self, token0: str, token1: str, fee: int, pool_data: List[Dict]) -> None:
+    def add_pool_data(self, pool_data: List[Dict]) -> None:
         """Add pool data to the pool data table and related event tables."""
-        token0 = token0[-4:]
-        token1 = token1[-4:]
-        
-        # Add the pool data to the pool data table
-        table_name = f'pool_data_{token0}_{token1}_{fee}'
-        self.ensure_table_exists(table_name, self.create_pool_data_table, token0=token0, token1=token1, fee=fee)
-        table = Table(table_name, MetaData(), autoload_with=self.engine)
-
         insert_values = [
-            {'block_number': data['block_number'], 'event_type': data['event']['type'], 'transaction_hash': data['transaction_hash']}
+            Pooldatatable(block_number=data['block_number'], event_type=data['event']['type'], transaction_hash=data['transaction_hash'])
             for data in pool_data
         ]
 
-        insert_query = table.insert().values(insert_values)
         with self.Session() as session:
-            session.execute(insert_query)
+            session.add_all(insert_values)  # Add the pool data to the pool data table
             session.commit()
 
-        # Add the swap event data to the swap event tables
-        swap_table_name = f'swap_event_{token0}_{token1}_{fee}'
-        self.ensure_table_exists(table_name, self.create_swap_event_table, token0=token0, token1=token1, fee=fee)
-        swap_table = Table(swap_table_name, MetaData(), autoload_with=self.engine)
-
+        # Add the swap event data to the swap event table
         swap_event_data = [
-            {'transaction_hash': data['transaction_hash'], **data['event']['data']}
+            SwapEventTable(transaction_hash=data['transaction_hash'], pool_address = data['pool_address'],  **data['event']['data'])
             for data in pool_data if data['event']['type'] == 'swap'
         ]
         if swap_event_data:
-            insert_query = swap_table.insert().values(swap_event_data)
             with self.Session() as session:
-                session.execute(insert_query)
+                session.add_all(swap_event_data)
                 session.commit()
 
-        # Add the mint event data to the mint event tables
-        mint_table_name = f'mint_event_{token0}_{token1}_{fee}'
-        self.ensure_table_exists(table_name, self.create_mint_event_table, token0=token0, token1=token1, fee=fee)
-        mint_table = Table(mint_table_name, MetaData(), autoload_with=self.engine)
-
+        # Add the mint event data to the mint event table
         mint_event_data = [
-            {'transaction_hash': data['transaction_hash'], **data['event']['data']}
+            MintEventTable(transaction_hash=data['transaction_hash'], pool_address = data['pool_address'], **data['event']['data'])
             for data in pool_data if data['event']['type'] == 'mint'
         ]
         if mint_event_data:
-            insert_query = mint_table.insert().values(mint_event_data)
             with self.Session() as session:
-                session.execute(insert_query)
+                session.add_all(mint_event_data)
                 session.commit()
 
-        # Add the burn event data to the burn event tables
-        burn_table_name = f'burn_event_{token0}_{token1}_{fee}'
-        self.ensure_table_exists(table_name, self.create_burn_event_table, token0=token0, token1=token1, fee=fee)
-        burn_table = Table(burn_table_name, MetaData(), autoload_with=self.engine)
-
+        # Add the burn event data to the burn event table
         burn_event_data = [
-            {'transaction_hash': data['transaction_hash'], **data['event']['data']}
+            BurnEventTable(transaction_hash=data['transaction_hash'], pool_address = data['pool_address'], **data['event']['data'])
             for data in pool_data if data['event']['type'] == 'burn'
         ]
         if burn_event_data:
-            insert_query = burn_table.insert().values(burn_event_data)
             with self.Session() as session:
-                session.execute(insert_query)
+                session.add_all(burn_event_data)
                 session.commit()
 
-        # Add the collect event data to the collect event tables
-        collect_table_name = f'collect_event_{token0}_{token1}_{fee}'
-        self.ensure_table_exists(table_name, self.create_collect_event_table, token0=token0, token1=token1, fee=fee)
-        collect_table = Table(collect_table_name, MetaData(), autoload_with=self.engine)
-
+        # Add the collect event data to the collect event table
         collect_event_data = [
-            {'transaction_hash': data['transaction_hash'], **data['event']['data']}
+            CollectEventTable(transaction_hash=data['transaction_hash'], pool_address = data['pool_address'], **data['event']['data'])
             for data in pool_data if data['event']['type'] == 'collect'
         ]
         if collect_event_data:
-            insert_query = collect_table.insert().values(collect_event_data)
             with self.Session() as session:
-                session.execute(insert_query)
+                session.add_all(collect_event_data)
                 session.commit()

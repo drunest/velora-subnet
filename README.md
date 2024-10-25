@@ -23,7 +23,7 @@ Velora's architecture is designed for scalability and performance. By utilizing 
 You can run your own Ethereum node locally using the following command:
 
 ```bash
-docker compose up -d ethereum-node
+docker compose up -d geth prysm
 ```
 
 Please note that this process may take a significant amount of time to fetch all the necessary data.
@@ -52,7 +52,7 @@ If you have an alternative Ethereum node that you’d like to use, you can speci
 
 4. To run the miner:
    ```bash
-   comx module serve src.subnet.miner.model.Miner <name-of-your-com-key> --subnets-whitelist <your-subnet-netuid> [--ip <text>] [--port <number>]
+   python3 -m src.subnet.miner.cli <your-key-name> <your-subnet-netuid> [--network <text>] [--ip <text>] [--port <number>]
    ```
 
 ### Running Validator
@@ -73,21 +73,21 @@ If you have an alternative Ethereum node that you’d like to use, you can speci
 
 5. To run the validator:
    ```bash
-   python3 -m src.subnet.cli <name-of-your-com-key>
+   python3 -m src.subnet.cli <name-of-your-com-key> [--network <text>] [--ip <text>] [--port <number>]
    ```
 
 ### Running Miner with PM2
 
 To run the miner using PM2 for process management:
 ```bash
-pm2 start "comx module serve subnet.miner.model.Miner <name-of-your-com-key> --subnets-whitelist <your-subnet-netuid>" --name velora-miner
+pm2 start "python3 -m src/subnet/miner/cli.py <your-key-name> --network mainnet --ip <ip address of registered module> --port <port number of registered module>" --name velora-miner
 ```
 
 ### Running Validator with PM2
 
 To run the validator using PM2:
 ```bash
-pm2 start "python3 -m subnet.cli <name-of-your-com-key>" --name velora-validator
+pm2 start "python3 -m src.subnet.cli <your-key-name> --network mainnet --ip <ip address of registered module> --port <port number of registered module>" --name velora-validator
 ```
 
 ## Scoring Miners
